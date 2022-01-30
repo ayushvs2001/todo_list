@@ -1,0 +1,94 @@
+{% extends "api/base2.html" %}
+
+{% block content %}
+
+<div class="d-flex justify-content-center">
+
+
+	<h3 id="form-title">LOGIN</h3>
+</div>
+<div class="d-flex justify-content-center form_container">
+		<form method="POST" action="">
+			{% csrf_token %}
+			<div class="input-group mb-3">
+				<div class="input-group-append">
+					<span class="input-group-text"><i class="fas fa-user"></i></span>
+				</div>
+
+				<input type="text" name="username" id="username" placeholder="Username..." class="form-control">
+			</div>
+
+			<div class="input-group mb-2">
+				<div class="input-group-append">
+					<span class="input-group-text"><i class="fas fa-key"></i></span>
+				</div>
+
+					<input type="password" name="password" id="password" placeholder="Password..." class="form-control" >
+			</div>
+
+				<div class="d-flex justify-content-center mt-3 login_container">
+					<input class="btn login_btn" type="submit"  onclick='create_token()' value="Login">
+					</div>
+		</form>
+
+</div>
+
+{% for message in messages %}
+	<p id="messages">{{message}}</p>
+{% endfor %}
+
+<div class="mt-4">
+	<div class="d-flex justify-content-center links">
+		Don't have an account? <a href="{% url 'user_register' %}" class="ml-2">Sign Up</a>
+	</div>
+
+</div>
+
+
+<script type="text/javascript">
+		function getCookie(name) {
+		    var cookieValue = null;
+		    if (document.cookie && document.cookie !== '') {
+		        var cookies = document.cookie.split(';');
+		        for (var i = 0; i < cookies.length; i++) {
+		            var cookie = cookies[i].trim();
+		            // Does this cookie string begin with the name we want?
+		            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+		                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+		                break;
+		            }
+		        }
+		    }
+		    return cookieValue;
+		}
+ 		var csrftoken = getCookie('csrftoken');
+
+ const config2 = {
+	  headers: {
+		 	 'Content-Type': 'application/json',
+		 	 'accept': 'application/json',
+		 	 'X-CSRFToken':csrftoken,
+	  },
+ };
+
+ function	create_token() {
+	 // event.preventDefault();
+	 var username = document.getElementById('username').value;
+	 var password = document.getElementById('password').value;
+	 axios({
+				 method:'post',
+				 url:"http://127.0.0.1:8000/gettoken/",
+				 data:{"username":username, 'password':password},
+				 headers: config2.headers,
+			 },
+		 )
+		 .then((response) => {
+			localStorage.setItem('id_token', response.data.access)
+      localStorage.setItem('id_token_refresh', response.data.refresh)
+		 })
+		 .catch(err => console.error(err));
+ }
+
+	</script>
+	
+{% endblock %}

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>TO DO</title>
+
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+	<link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+	<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.1/css/all.css" integrity="sha384-gfdkjb5BdAXd+lj+gudLWI+BXq4IuLW5IT+brZEZsLFm++aCMlF1V92rMkPaX4PP" crossorigin="anonymous">
+
+	<style type="text/css">
+		body{
+			background: -webkit-gradient(linear, left top, right top, from(#f29263), to(#ee5a6f));
+      background: linear-gradient(to right, #ee5a6f, #f29263)
+		}
+
+		h1, h2, h3, h4, h5, p, span, strike{
+		  font-family: 'Montserrat', sans-serif;
+		}
+
+		#task-container{
+		  max-width:600px;
+		  margin:0 auto;
+		  box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+		  background-color: #fff;
+
+		  margin-top:100px;
+		  margin-bottom:100px;
+
+		  justify-content: space-around;
+		  align-items: flex-start;
+
+		}
+
+		#form-wrapper{
+		  position: -webkit-sticky;
+		  position: sticky;
+		  top: 0rem;
+		  border-bottom: 1px solid  #e9e9e9;
+		  background-color: #fff;
+		  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+ 		  padding:40px;
+		}
+
+		#submit{
+		  background-color: #ee5a6f;
+		  border-radius: 0;
+		  border:0;
+		  color: #fff;
+		}
+
+		.flex-wrapper{
+			display: flex;
+		}
+
+		.task-wrapper{
+		  	margin:5px;
+		  	padding: 5px;
+		  	padding:20px;
+		  	cursor: pointer;
+		  	border-bottom: 1px solid  #e9e9e9;
+		  	color: #686868;
+			}
+
+	</style>
+
+</head>
+<body>
+	<div class="container">
+		<div class="input-group-append"  style="float: right;">
+			<span class="input-group-text"><a href="{% url 'logout' %}"><i class="fas fa-sign-out-alt fa-2x"></i></a></span>
+		</div>
+
+    <!-- <h1>{{ info }}</h1> -->
+		<div id="task-container">
+			<div id="form-wrapper">
+				<form id="form">
+					<div class="flex-wrapper">
+						<div style="flex: 6">
+							<input id="title" class="form-control" type="text" name="title" placeholder="Add task">
+						</div>
+						<div style="flex: 1">
+							<input id="submit" class="btn" type="submit" >
+						</div>
+					</div>
+				</form>
+			</div>
+
+			<div id="list-wrapper">
+
+			</div>
+		</div>
+
+	</div>
+
+	<script type="text/javascript">
+
+		function getCookie(name) {
+		    var cookieValue = null;
+		    if (document.cookie && document.cookie !== '') {
+		        var cookies = document.cookie.split(';');
+		        for (var i = 0; i < cookies.length; i++) {
+		            var cookie = cookies[i].trim();
+		            // Does this cookie string begin with the name we want?
+		            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+		                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+		                break;
+		            }
+		        }
+		    }
+		    return cookieValue;
+		}
+		var csrftoken = getCookie('csrftoken');
+
+		function getToken() {
+			return localStorage.getItem('id_token');
+		}
+
+		function getRefreshToken() {
+			return localStorage.getItem('id_token_refresh');
+		}
+
+		let current_token = getToken();
+
+		var activeItem = null
+		var list_snapshot = []
+
+
+ //  used to verify both access adnd refresh token
+  function verifyToken(func){
+			return new Promise((resolve, reject) =>{
+				axios({
+						 method:'post',
+						 url:"http://127.0.0.1:8000/verifytoken/",
+						 data:{   "token": func() },
+						 headers: {
+							 'Content-Type': 'application/json',
+							 'accept': 'application/json',
+							 'X-CSRFToken':csrftoken,
+						 },
+					 })
+			.then((response) => {
+			    resolve(response);
+				})
+			.catch(err => reject(err))
+   })
+	}
+
+	// used to refrsh refresh token
+	function refreshToken(){
+		return new Promise((resolve, reject) =>{
+  		axios({
+					 method:'post',
+					 url:"http://127.0.0.1:8000/refreshtoken/",
+					 data:{   "refresh": getRefreshToken() },
+					 headers: {
+						 'Content-Type': 'application/json',
+						 'accept': 'application/json',
+						 'X-CSRFToken':csrftoken,
+					 },
+				 })
+		.then((response) => {
+				resolve(response);
+			})
+		.catch(err => reject(err))
+	})
+	}
+
+  // used to verify both
+	async function getVerifiedAccessToken(){
+		try {
+			 var objAccessToken = await verifyToken(getToken);
+			 return getToken();
+				}
+		catch {
+			try{
+			var objRefreshToken = await verifyToken(getRefreshToken);
+			if(objRefreshToken.status == 200){
+				var newTokens = await refreshToken();
+				localStorage.setItem('id_token', newTokens.data.access)
+				return getToken();
+			}
+		 }
+			catch{
+        window.location = "http://127.0.0.1:8000/accounts/logout/"
+			}
+		}
+	}
+
+
+	buildList()
+
+	async function buildList(){
+
+			var wrapper = document.getElementById('list-wrapper')
+			//wrapper.innerHTML = ''
+
+			var url = 'http://127.0.0.1:8000/api/'
+
+			const config1 = {
+				headers: {
+					'Content-Type': 'application/json',
+					'accept': 'application/json',
+				 	'Authorization': "JWT " + await getVerifiedAccessToken(),
+				},
+			};
+
+   		axios
+	    .get('http://127.0.0.1:8000/api/', {
+	      timeout: 5000,
+				headers: config1.headers,
+	    })
+	    .then((res) => res.data)
+			.then(function(data){
+
+				var list = data
+				for (var i in list){
+
+
+					try{
+						document.getElementById(`data-row-${i}`).remove()
+					}catch(err){
+
+					}
+
+
+					var title = `<span class="title">${list[i].title}</span>`
+					if (list[i].completed == true){
+						//  this strike is used to create line of letters
+						title = `<strike class="title">${list[i].title}</strike>`
+					}
+
+					var item = `
+						<div id="data-row-${i}" class="task-wrapper flex-wrapper">
+							<div style="flex:7">
+								${title}
+							</div>
+							<div style="flex:1">
+								<button class="btn btn-sm btn-outline-info edit">Edit </button>
+							</div>
+							<div style="flex:1">
+								<button class="btn btn-sm btn-outline-dark delete">-</button>
+							</div>
+						</div>
+
+					`
+					wrapper.innerHTML += item
+
+				}
+
+				if (list_snapshot.length > list.length){
+					for (var i = list.length; i < list_snapshot.length; i++){
+						document.getElementById(`data-row-${i}`).remove()
+					}
+				}
+
+				list_snapshot = list
+
+
+				for (var i in list){
+					var editBtn = document.getElementsByClassName('edit')[i]
+					var deleteBtn = document.getElementsByClassName('delete')[i]
+					var title = document.getElementsByClassName('title')[i]
+
+
+					editBtn.addEventListener('click', (function(item){
+						return function(){
+							editItem(item)
+						}
+					})(list[i]))
+
+
+					deleteBtn.addEventListener('click', (function(item){
+						return function(){
+							deleteItem(item)
+						}
+					})(list[i]))
+
+
+					title.addEventListener('click', (function(item){
+						return function(){
+							strikeUnstrike(item)
+						}
+					})(list[i]))
+				}
+			})
+			.catch(err => console.error(err));
+		}
+
+		const config2 = {
+ 		 headers: {
+ 			 'Content-Type': 'application/json',
+ 			 'accept': 'application/json',
+ 			 'X-CSRFToken':csrftoken,
+ 		 },
+ 	 };
+
+    // function to update or create task
+		var form = document.getElementById('form-wrapper')
+		form.addEventListener('submit', async function(e){
+			e.preventDefault()
+			config2.headers['Authorization'] =  "JWT " + await getVerifiedAccessToken();
+			var my_request = "POST";
+			var url = 'http://127.0.0.1:8000/api/'
+			if (activeItem != null){
+				my_request = "PUT";
+				var url = `http://127.0.0.1:8000/api/${activeItem.id}/`
+				activeItem = null
+			}
+
+			var title = document.getElementById('title').value
+			axios({
+						method: my_request,
+						url:url,
+		        data:{'title':title, 'completed':false},
+						headers: config2.headers,
+					},
+		    )
+				.then(function(response){
+					buildList()
+					document.getElementById('form').reset()
+				})
+				.catch(err => window.location = "http://127.0.0.1:8000/unauthorized/");
+		})
+
+
+
+
+		function editItem(item){
+			activeItem = item
+			document.getElementById('title').value = activeItem.title
+		}
+
+
+  // function to delete tasks
+	 async function deleteItem(item){
+		 config2.headers['Authorization'] =  "JWT " + await getVerifiedAccessToken();
+			axios({
+						method:'delete',
+						url:"http://127.0.0.1:8000/api/"+item.id+ "/",
+						headers: config2.headers,
+					},
+				)
+				.then((response) => {
+					buildList()
+				})
+				.catch(err => window.location = "http://127.0.0.1:8000/unauthorized/") ;
+		}
+
+    // function to show task complete or incomplete
+		async function strikeUnstrike(item){
+			config2.headers['Authorization'] =  "JWT " + await getVerifiedAccessToken();
+
+			item.completed = !item.completed
+			axios({
+						method:'put',
+						url:"http://127.0.0.1:8000/api/"+item.id+ "/",
+		        data:{'title':item.title, 'completed':item.completed},
+						headers: config2.headers,
+					},
+		    )
+				.then((response) => {
+					buildList()
+				})
+				.catch(err => window.location = "http://127.0.0.1:8000/unauthorized/");
+		}
+
+	</script>
+
+</body>
+</html>
